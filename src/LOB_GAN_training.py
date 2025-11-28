@@ -14,6 +14,13 @@ from torch.utils.data import Dataset
 from torch.utils.data import random_split
 from torch.utils.data import DataLoader
 import random
+import sys
+from pathlib import Path
+
+
+DATA_DIR = Path(__file__).resolve().parent.parent / 'data' / "assignment4_datafiles"
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / 'output_train'
+
 
 class Generator(nn.Module):
     def __init__(self):
@@ -142,10 +149,16 @@ def get_verge(x, y):
 
 if __name__ == '__main__':
     ###Prepare common directory
-    stockDataDir = 'E:\\Workbench\\UChicago\\UChicago_2025MMMLectures\\Assignments\\Assignment4\\references\\'
+    # Use plain string path so string concatenation below works as written
+    stockDataDir = str(DATA_DIR) + os.sep
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
     
     ###Prepare stock list
-    stock = "0056"
+    # stocks = ['2330', '0050', '0056']
+    stock = "2330"
+
+
 
     cols = ["date","time","lastPx","size","volume","SP1","BP1","SV1","BV1","SP2","BP2","SV2","BV2","SP3","BP3","SV3","BV3","SP4","BP4","SV4","BV4","SP5","BP5","SV5","BV5"]
 
@@ -157,26 +170,29 @@ if __name__ == '__main__':
     file1Path = stockDataDir + stock + '_md_202310_202310.csv.gz'
     file2Path = stockDataDir + stock + '_md_202311_202311.csv.gz'
     file3Path = stockDataDir + stock + '_md_202312_202312.csv.gz'
+
+
     df = pd.DataFrame()
     if os.path.exists(file1Path):
         df = pd.concat([df, pd.read_csv(file1Path, compression='gzip', usecols = cols)])
         print('Data 1 for ' + stock + ' loaded.')
     else:
-        print('Skipping snapshots data ' + file1Path + ' for ' + stock + '.')
+        print(f"Skipping snapshots data {file1Path} for {stock}.")
     if os.path.exists(file2Path):
         df = pd.concat([df, pd.read_csv(file2Path, compression='gzip', usecols = cols)])
         print('Data 2 for ' + stock + ' loaded.')
     else:
-        print('Skipping snapshots data ' + file2Path + ' for ' + stock + '.')
+        print(f"Skipping snapshots data {file2Path} for {stock}.")
     if os.path.exists(file3Path):
         df = pd.concat([df, pd.read_csv(file3Path, compression='gzip', usecols = cols)])
         print('Data 3 for ' + stock + ' loaded.')
     else:
-        print('Skipping snapshots data ' + file3Path + ' for ' + stock + '.')
+        print(f"Skipping snapshots data {file3Path} for {stock}.")
 
     if df.empty:
         print('No order snapshot data loaded. Skipping ' + stock)
         print("No raw data to process; exit.")
+
         
     else:    
         minutelyData = prepareMinutelyData(df, tradingDays)
@@ -184,10 +200,10 @@ if __name__ == '__main__':
         
         projdata = []
         columns = ['date', 'time', 'lastPx', 'size', 'volume',
-                   'SP5', 'SP4', 'SP3', 'SP2', 'SP1',
-                   'BP1', 'BP2', 'BP3', 'BP4', 'BP5',
-                   'SV5', 'SV4', 'SV3', 'SV2', 'SV1',
-                   'BV1', 'BV2', 'BV3', 'BV4', 'BV5']
+                'SP5', 'SP4', 'SP3', 'SP2', 'SP1',
+                'BP1', 'BP2', 'BP3', 'BP4', 'BP5',
+                'SV5', 'SV4', 'SV3', 'SV2', 'SV1',
+                'BV1', 'BV2', 'BV3', 'BV4', 'BV5']
         
         for x in minutelyData.groupby('date'):
             if x[1].shape[0] == 265:
@@ -263,18 +279,18 @@ if __name__ == '__main__':
                 dd_gen = d_gen[:,1:,:] - d_gen[:,:-1,:]
         
                 g_loss = loss_function(discriminator(gen), real) + \
-                         loss_function(torch.mean(torch.abs(data), axis=1), torch.mean(torch.abs(gen), axis=1)) + \
-                         loss_function(torch.mean(data, axis=1), torch.mean(gen, axis=1)) + \
-                         loss_function(torch.mean(data ** 2, axis=1), torch.mean(gen ** 2, axis=1)) + \
-                         loss_function(torch.mean(data ** 3, axis=1), torch.mean(gen ** 3, axis=1)) + \
-                         loss_function(torch.mean(torch.abs(d_data), axis=1), torch.mean(torch.abs(d_gen), axis=1)) + \
-                         loss_function(torch.mean(d_data, axis=1), torch.mean(d_gen, axis=1)) + \
-                         loss_function(torch.mean(d_data ** 2, axis=1), torch.mean(d_gen ** 2, axis=1)) +\
-                         loss_function(torch.mean(d_data ** 3, axis=1), torch.mean(d_gen ** 3, axis=1)) +\
-                         loss_function(torch.mean(torch.abs(dd_data), axis=1), torch.mean(torch.abs(dd_gen), axis=1)) + \
-                         loss_function(torch.mean(dd_data, axis=1), torch.mean(dd_gen, axis=1)) + \
-                         loss_function(torch.mean(dd_data ** 2, axis=1), torch.mean(dd_gen ** 2, axis=1)) +\
-                         loss_function(torch.mean(dd_data ** 3, axis=1), torch.mean(dd_gen ** 3, axis=1))
+                        loss_function(torch.mean(torch.abs(data), axis=1), torch.mean(torch.abs(gen), axis=1)) + \
+                        loss_function(torch.mean(data, axis=1), torch.mean(gen, axis=1)) + \
+                        loss_function(torch.mean(data ** 2, axis=1), torch.mean(gen ** 2, axis=1)) + \
+                        loss_function(torch.mean(data ** 3, axis=1), torch.mean(gen ** 3, axis=1)) + \
+                        loss_function(torch.mean(torch.abs(d_data), axis=1), torch.mean(torch.abs(d_gen), axis=1)) + \
+                        loss_function(torch.mean(d_data, axis=1), torch.mean(d_gen, axis=1)) + \
+                        loss_function(torch.mean(d_data ** 2, axis=1), torch.mean(d_gen ** 2, axis=1)) +\
+                        loss_function(torch.mean(d_data ** 3, axis=1), torch.mean(d_gen ** 3, axis=1)) +\
+                        loss_function(torch.mean(torch.abs(dd_data), axis=1), torch.mean(torch.abs(dd_gen), axis=1)) + \
+                        loss_function(torch.mean(dd_data, axis=1), torch.mean(dd_gen, axis=1)) + \
+                        loss_function(torch.mean(dd_data ** 2, axis=1), torch.mean(dd_gen ** 2, axis=1)) +\
+                        loss_function(torch.mean(dd_data ** 3, axis=1), torch.mean(dd_gen ** 3, axis=1))
         
                 g_loss.backward()
                 torch.nn.utils.clip_grad_norm_(generator.parameters(), 0.3) #clipping the gradient
@@ -297,7 +313,7 @@ if __name__ == '__main__':
         
                 if i % 10 == 0:
                     print("[Epoch %d/%d][Batch %d/%d][D train loss: %f][G train loss: %f]" % (epoch+1, epochs, i+1, len(train_dataloader),
-                                                                                 d_loss.item(), g_loss.item()))
+                                                                                d_loss.item(), g_loss.item()))
         
             #validation data set
             g_loss_total = 0
@@ -319,18 +335,18 @@ if __name__ == '__main__':
                 dd_gen = d_gen[:,1:,:] - d_gen[:,:-1,:]
         
                 g_loss = loss_function(discriminator(gen), real) + \
-                         loss_function(torch.mean(torch.abs(data), axis=1), torch.mean(torch.abs(gen), axis=1)) + \
-                         loss_function(torch.mean(data, axis=1), torch.mean(gen, axis=1)) + \
-                         loss_function(torch.mean(data ** 2, axis=1), torch.mean(gen ** 2, axis=1)) + \
-                         loss_function(torch.mean(data ** 3, axis=1), torch.mean(gen ** 3, axis=1)) + \
-                         loss_function(torch.mean(torch.abs(d_data), axis=1), torch.mean(torch.abs(d_gen), axis=1)) + \
-                         loss_function(torch.mean(d_data, axis=1), torch.mean(d_gen, axis=1)) + \
-                         loss_function(torch.mean(d_data ** 2, axis=1), torch.mean(d_gen ** 2, axis=1)) +\
-                         loss_function(torch.mean(d_data ** 3, axis=1), torch.mean(d_gen ** 3, axis=1)) +\
-                         loss_function(torch.mean(torch.abs(dd_data), axis=1), torch.mean(torch.abs(dd_gen), axis=1)) + \
-                         loss_function(torch.mean(dd_data, axis=1), torch.mean(dd_gen, axis=1)) + \
-                         loss_function(torch.mean(dd_data ** 2, axis=1), torch.mean(dd_gen ** 2, axis=1)) +\
-                         loss_function(torch.mean(dd_data ** 3, axis=1), torch.mean(dd_gen ** 3, axis=1))
+                        loss_function(torch.mean(torch.abs(data), axis=1), torch.mean(torch.abs(gen), axis=1)) + \
+                        loss_function(torch.mean(data, axis=1), torch.mean(gen, axis=1)) + \
+                        loss_function(torch.mean(data ** 2, axis=1), torch.mean(gen ** 2, axis=1)) + \
+                        loss_function(torch.mean(data ** 3, axis=1), torch.mean(gen ** 3, axis=1)) + \
+                        loss_function(torch.mean(torch.abs(d_data), axis=1), torch.mean(torch.abs(d_gen), axis=1)) + \
+                        loss_function(torch.mean(d_data, axis=1), torch.mean(d_gen, axis=1)) + \
+                        loss_function(torch.mean(d_data ** 2, axis=1), torch.mean(d_gen ** 2, axis=1)) +\
+                        loss_function(torch.mean(d_data ** 3, axis=1), torch.mean(d_gen ** 3, axis=1)) +\
+                        loss_function(torch.mean(torch.abs(dd_data), axis=1), torch.mean(torch.abs(dd_gen), axis=1)) + \
+                        loss_function(torch.mean(dd_data, axis=1), torch.mean(dd_gen, axis=1)) + \
+                        loss_function(torch.mean(dd_data ** 2, axis=1), torch.mean(dd_gen ** 2, axis=1)) +\
+                        loss_function(torch.mean(dd_data ** 3, axis=1), torch.mean(dd_gen ** 3, axis=1))
                 g_loss_total += g_loss
         
                 #evaluate the discriminator
@@ -346,7 +362,7 @@ if __name__ == '__main__':
         
                 
             print("[Epoch %d/%d][Batch %d/%d][D eval loss: %f][G eval loss: %f]" % (epoch+1, epochs, i+1, len(eval_dataloader),
-                                                                                   d_loss_total.item()/len(eval_dataloader),
+                                                                                d_loss_total.item()/len(eval_dataloader),
                                                                                     g_loss_total.item()/len(eval_dataloader)))
         
             train_verge.append(get_verge(train_g_loss[-len(train_dataloader):], train_d_loss[-len(train_dataloader):]))    
@@ -357,15 +373,22 @@ if __name__ == '__main__':
                 if train_verge[-3] > train_verge[-2] and train_verge[-2] > train_verge[-1] and eval_verge[-3] < eval_verge[-2] and eval_verge[-2] < eval_verge[-1]:
                     break
                 
-        # persist training results on training data
-        pd.DataFrame([train_g_loss, train_d_loss], index=['train_g', 'train_d']).to_csv(stock+'_train_g_d.csv')
-        # persist validation results on validation data
-        pd.DataFrame([eval_g_loss, eval_d_loss], index=['eval_g', 'eval_d']).to_csv(stock+'_eval_g_d.csv')
+        # # persist training results on training data
+        # pd.DataFrame([train_g_loss, train_d_loss], index=['train_g', 'train_d']).to_csv(stock+'_train_g_d.csv')
+        # # persist validation results on validation data
+        # pd.DataFrame([eval_g_loss, eval_d_loss], index=['eval_g', 'eval_d']).to_csv(stock+'_eval_g_d.csv')
                 
-        #persist the model
-        torch.save(generator, stock+'_generator1.pth')
-        torch.save(discriminator, stock+'_discriminator1.pth')
+        # #persist the model
+        # torch.save(generator, stock+'_generator1.pth')
+        # torch.save(discriminator, stock+'_discriminator1.pth')
+
+        pd.DataFrame([train_g_loss, train_d_loss], index=['train_g','train_d']).to_csv(OUTPUT_DIR / f"{stock}_train_g_d.csv")
+        pd.DataFrame([eval_g_loss, eval_d_loss], index=['eval_g','eval_d']).to_csv(OUTPUT_DIR / f"{stock}_eval_g_d.csv")
+        torch.save(generator, OUTPUT_DIR / f"{stock}_generator1.pth")
+        torch.save(discriminator, OUTPUT_DIR / f"{stock}_discriminator1.pth")
+
+
         
         print("Done training LOB_GAN for stock " + stock)
-        
-        
+    
+    

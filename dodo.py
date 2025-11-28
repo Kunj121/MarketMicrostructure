@@ -29,5 +29,19 @@ def unzip_files():
 
     print("✓ All zip files extracted successfully.")
 
+
+def install_requirements():
+    """
+    Install required packages from requirements.txt.
+    """
+    import subprocess
+    import sys
+
+    requirements_file = Path(__file__).resolve().parent / "requirements.txt"
+    if requirements_file.exists():
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", str(requirements_file)])
+    else:
+        print("No requirements.txt file found.")
+
 if __name__ == "__main__":
     unzip_files()

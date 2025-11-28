@@ -17,6 +17,14 @@ import random
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+from pathlib import Path
+
+DATA_DIR = Path(__file__).resolve().parent.parent / 'data' / "assignment4_datafiles"
+PLOT_DIR = Path(__file__).resolve().parent.parent / 'plots'
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / 'output_train'
+
+
+
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
@@ -143,10 +151,12 @@ def get_verge(x, y):
 
 if __name__ == '__main__':
     ###Prepare common directory
-    stockDataDir = 'E:\\Workbench\\UChicago\\UChicago_2025MMMLectures\\Assignments\\Assignment4\\references\\'
+    stockDataDir = str(DATA_DIR) + os.sep
+
     
     ###Prepare stock list
-    stock = "0050"
+    # stocks = ["0056", "0050", "2330"]
+    stock = '0056'
 
     cols = ["date","time","lastPx","size","volume","SP1","BP1","SV1","BV1","SP2","BP2","SV2","BV2","SP3","BP3","SV3","BV3","SP4","BP4","SV4","BV4","SP5","BP5","SV5","BV5"]
 
@@ -185,10 +195,10 @@ if __name__ == '__main__':
     
     projdata = []
     columns = ['date', 'time', 'lastPx', 'size', 'volume',
-               'SP5', 'SP4', 'SP3', 'SP2', 'SP1',
-               'BP1', 'BP2', 'BP3', 'BP4', 'BP5',
-               'SV5', 'SV4', 'SV3', 'SV2', 'SV1',
-               'BV1', 'BV2', 'BV3', 'BV4', 'BV5']
+            'SP5', 'SP4', 'SP3', 'SP2', 'SP1',
+            'BP1', 'BP2', 'BP3', 'BP4', 'BP5',
+            'SV5', 'SV4', 'SV3', 'SV2', 'SV1',
+            'BV1', 'BV2', 'BV3', 'BV4', 'BV5']
     
     for x in minutelyData.groupby('date'):
         if x[1].shape[0] == 265:
@@ -223,8 +233,8 @@ if __name__ == '__main__':
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
     
     #load the model
-    generator = torch.load(stock+'_generator1.pth', weights_only=False)
-    discriminator = torch.load(stock+'_discriminator1.pth', weights_only=False)
+    generator = torch.load(OUTPUT_DIR / f"{stock}_generator1.pth", weights_only=False)
+    discriminator = torch.load(OUTPUT_DIR / f"{stock}_discriminator1.pth", weights_only=False)
     print("Model loaded.")    
     
     #apply test data and check the abnormal data
@@ -273,4 +283,4 @@ if __name__ == '__main__':
     ax2 = sns.kdeplot(ret, label='realRtn')
     plt.legend()
     plt.show()
-    plt.savefig(stock + '_return.png')
+    plt.savefig(PLOT_DIR / f"{stock}_return.png")
