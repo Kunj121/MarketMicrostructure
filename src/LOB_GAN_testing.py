@@ -20,8 +20,9 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 DATA_DIR = Path(__file__).resolve().parent.parent / 'data' / "assignment4_datafiles"
-PLOT_DIR = Path(__file__).resolve().parent.parent / 'plots'
+PLOT_DIR = Path(__file__).resolve().parent.parent / 'plots' / "testing_plots"
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / 'output_train'
+OUTPUT_DIR_TEST = Path(__file__).resolve().parent.parent / 'output_test'
 
 def find_params_folder(lr_g: float, lr_d: float):
     """
@@ -170,7 +171,6 @@ def run_gan_test(lr_g, lr_d, stock):
     ###Prepare common directory
     stockDataDir = str(DATA_DIR) + os.sep
 
-    print(f"[{stock}] Starting GAN test with lr_g={lr_g}, lr_d={lr_d}")
     
     ###Prepare stock list
     # stocks = ["0056", "0050", "2330"]
@@ -210,7 +210,6 @@ def run_gan_test(lr_g, lr_d, stock):
     else:    
         minutelyData = prepareMinutelyData(df, tradingDays)
         print("Minutely data generated.")
-        print(f"[{stock}] Minutely rows: {len(minutelyData)}")
     
     projdata = []
     columns = ['date', 'time', 'lastPx', 'size', 'volume',
@@ -234,7 +233,6 @@ def run_gan_test(lr_g, lr_d, stock):
     
     X = np.transpose((np.transpose(X, (1,0,2)) - X_mean) / (2 * X_std), (1,0,2))
     X = np.nan_to_num(X, nan=0, posinf=0, neginf=0)
-    print(f"[{stock}] Normalized input shape: {X.shape}")
     
     #set up
     set_seed(307)
@@ -256,12 +254,12 @@ def run_gan_test(lr_g, lr_d, stock):
     # Find correct PARAMS folder for this lr_g / lr_d
     params_folder = find_params_folder(lr_g, lr_d)
     model_path = OUTPUT_DIR / params_folder
+    model_path_out = OUTPUT_DIR_TEST/ params_folder
 
     generator = torch.load(model_path / f"{stock}_generator1.pth", weights_only=False)
     discriminator = torch.load(model_path / f"{stock}_discriminator1.pth", weights_only=False)
 
     print(f"Loaded model from {model_path}")
-    print(f"[{stock}] Beginning evaluation loop over {len(test_dataloader)} batches")
     
     #apply test data and check the abnormal data
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
@@ -277,19 +275,33 @@ def run_gan_test(lr_g, lr_d, stock):
     ret.index = ret.index.swaplevel()
     ret = ret.rename(columns={'price': 'realRtn'})
 
+        # ensure directory exists
+    params_test_dir = OUTPUT_DIR_TEST / params_folder
+    params_test_dir.mkdir(parents=True, exist_ok=True)
+    # write CSVs
+    ret_csv_path = params_test_dir / f"{stock}_ret.csv"
+    print('Normal \n')
+    print('-------------------------')
+    print(ret.shape)
+    ret.to_csv(ret_csv_path)
+
+
     # compare "abnormal" quantifiers
     discriminator.eval()
     dis_index_list = []
     dis_ret_list = []
     dis_tomoret_list = []
+    dis_date_list = []
     for i, data in enumerate(test_dataloader):
         if discriminator(data) <= 0.5:
             #counter += 1
+            date = test_data[i,0,0]
             index = test_data[i, 0, -1]
             
             today_return = test_data[i,-1,2] / test_data[i,0,2] - 1
             dis_ret_list.append(today_return)
             dis_index_list.append(index)
+            dis_date_list.append(date)
             
             j = i + 1
             while j < test_data.shape[0] and test_data[j, 0, -1] != index:
@@ -304,18 +316,31 @@ def run_gan_test(lr_g, lr_d, stock):
     dis_ret.index = dis_index_list
     dis_ret['return'] = dis_ret_list
     dis_ret['tomorrow_return'] = dis_tomoret_list
-    print(f"[{stock}] Discriminator flagged {len(dis_ret)} sequences")
-    
+    print('Abnormal \n')
+    print('-------------------------')
+    print(dis_ret.shape)
+
+
+    dis_ret_csv_path = params_test_dir / f"{stock}_dis_ret.csv"
+    dis_ret.to_csv(dis_ret_csv_path)
+
+    if len(dis_ret) == 0:
+        print(f"[{stock}] Discriminator flagged 0 sequences; skipping KDE plot.")    
     ax1 = sns.kdeplot(dis_ret['return'].values, linestyle='--', fill=True, label='discrimatedRtn')
     ax2 = sns.kdeplot(ret, label='realRtn')
     plt.legend()
-    plt.show()
-    plt.savefig(PLOT_DIR / f"{stock}_return.png")
-    print(f"[{stock}] Saved plot to {PLOT_DIR / f'{stock}_return.png'}")
+
+    # Create a subfolder in PLOT_DIR matching the params folder used for this run
+    plot_subdir = PLOT_DIR / params_folder
+    plot_subdir.mkdir(parents=True, exist_ok=True)
+
+    # Save the figure into the params-specific plot directory
+    plt.savefig(plot_subdir / f"{stock}_return.png")
+    plt.close()
 
 if __name__ == '__main__':
         
-    stocks = ['2330','0050', '0056']
+    stocks = ['0056', '0050', '2330']
     for stock in stocks:
         run_gan_test(lr_g = 0.00375, lr_d = 0.001, stock= stock)
         print(f'completed stock : {stock}')

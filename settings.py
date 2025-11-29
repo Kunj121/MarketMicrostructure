@@ -5,6 +5,7 @@ import pandas as pd
 DATA_DIR = Path(__file__).resolve().parent / 'data' / "assignment4_datafiles"
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / 'output_train'
 TRAINING_PLOT_DIR = Path(__file__).resolve().parent / 'plots'/ 'training_plots'
+PARAMS = Path(__file__).resolve().parent / 'logs'
 
 # file = DATA_DIR / "0056_md_202310_202310.csv.gz"
 
