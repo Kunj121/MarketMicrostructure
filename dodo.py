@@ -3,7 +3,7 @@
 import zipfile
 from pathlib import Path
 
-def unzip_files():
+def task_unzip_files():
     """
     Unzip all .zip files inside the data/ folder and extract them into
     folders with matching names.
