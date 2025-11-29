@@ -13,13 +13,49 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 from torch.utils.data import random_split
 from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
 import random
 import sys
 from pathlib import Path
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
 
+from settings import G_PARAMS, D_PARAMS
 
 DATA_DIR = Path(__file__).resolve().parent.parent / 'data' / "assignment4_datafiles"
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / 'output_train'
+
+PARAMS_DIR = None
+
+def _get_params_output_dir() -> Path:
+    """
+    Create (once per run) a subfolder under OUTPUT_DIR named
+    PARAMS_1, PARAMS_2, ... depending on what already exists.
+    """
+    global PARAMS_DIR
+    if PARAMS_DIR is not None:
+        return PARAMS_DIR
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Find existing PARAMS_* directories
+    existing = []
+    for p in OUTPUT_DIR.iterdir():
+        if p.is_dir() and p.name.startswith("PARAMS_"):
+            parts = p.name.split("_")
+            if len(parts) == 2:
+                try:
+                    idx = int(parts[1])
+                    existing.append(idx)
+                except ValueError:
+                    continue
+
+    next_idx = (max(existing) + 1) if existing else 1
+    PARAMS_DIR = OUTPUT_DIR / f"PARAMS_{next_idx}"
+    PARAMS_DIR.mkdir(exist_ok=False)
+    return PARAMS_DIR
+
 
 
 class Generator(nn.Module):
@@ -147,16 +183,11 @@ def get_verge(x, y):
     y = np.mean(y)
     return np.sqrt(x ** 2 + y ** 2)
 
-if __name__ == '__main__':
+def run_gan(stock: str):
     ###Prepare common directory
     # Use plain string path so string concatenation below works as written
     stockDataDir = str(DATA_DIR) + os.sep
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    
-    ###Prepare stock list
-    # stocks = ['2330', '0050', '0056']
-    stock = "2330"
+    params_dir = _get_params_output_dir()
 
 
 
@@ -228,8 +259,8 @@ if __name__ == '__main__':
         discriminator = Discriminator()
         
         #params
-        optimizer_G = torch.optim.Adam(generator.parameters(), lr=0.00375, betas=(0.99, 0.999))
-        optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=0.001, betas=(0.99, 0.999))
+        optimizer_G = torch.optim.Adam(generator.parameters(), lr=G_PARAMS['lr'], betas=(0.99, 0.999))
+        optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=D_PARAMS['lr'], betas=(0.99, 0.999))
         
         #batch size
         batch_size = 50
@@ -311,11 +342,11 @@ if __name__ == '__main__':
                 train_g_loss.append(g_loss.item())
                 train_d_loss.append(d_loss.item())
         
-                if i % 10 == 0:
-                    print("[Epoch %d/%d][Batch %d/%d][D train loss: %f][G train loss: %f]" % (epoch+1, epochs, i+1, len(train_dataloader),
-                                                                                d_loss.item(), g_loss.item()))
+            #     if i % 10 == 0:
+            #         print("[Epoch %d/%d][Batch %d/%d][D train loss: %f][G train loss: %f]" % (epoch+1, epochs, i+1, len(train_dataloader),
+            #                                                                     d_loss.item(), g_loss.item()))
         
-            #validation data set
+            # #validation data set
             g_loss_total = 0
             d_loss_total = 0
             for i, data in enumerate(eval_dataloader):
@@ -361,9 +392,9 @@ if __name__ == '__main__':
                 eval_d_loss.append(d_loss.item())
         
                 
-            print("[Epoch %d/%d][Batch %d/%d][D eval loss: %f][G eval loss: %f]" % (epoch+1, epochs, i+1, len(eval_dataloader),
-                                                                                d_loss_total.item()/len(eval_dataloader),
-                                                                                    g_loss_total.item()/len(eval_dataloader)))
+            # print("[Epoch %d/%d][Batch %d/%d][D eval loss: %f][G eval loss: %f]" % (epoch+1, epochs, i+1, len(eval_dataloader),
+            #                                                                     d_loss_total.item()/len(eval_dataloader),
+            #                                                                         g_loss_total.item()/len(eval_dataloader)))
         
             train_verge.append(get_verge(train_g_loss[-len(train_dataloader):], train_d_loss[-len(train_dataloader):]))    
             eval_verge.append(get_verge(eval_g_loss[-len(eval_dataloader):], eval_d_loss[-len(eval_dataloader):]))
@@ -381,14 +412,63 @@ if __name__ == '__main__':
         # #persist the model
         # torch.save(generator, stock+'_generator1.pth')
         # torch.save(discriminator, stock+'_discriminator1.pth')
-
-        pd.DataFrame([train_g_loss, train_d_loss], index=['train_g','train_d']).to_csv(OUTPUT_DIR / f"{stock}_train_g_d.csv")
-        pd.DataFrame([eval_g_loss, eval_d_loss], index=['eval_g','eval_d']).to_csv(OUTPUT_DIR / f"{stock}_eval_g_d.csv")
-        torch.save(generator, OUTPUT_DIR / f"{stock}_generator1.pth")
-        torch.save(discriminator, OUTPUT_DIR / f"{stock}_discriminator1.pth")
+        pd.DataFrame([train_g_loss, train_d_loss], index=['train_g','train_d']).to_csv(params_dir / f"{stock}_train_g_d.csv")
+        pd.DataFrame([eval_g_loss, eval_d_loss], index=['eval_g','eval_d']).to_csv(params_dir / f"{stock}_eval_g_d.csv")
+        torch.save(generator, params_dir / f"{stock}_generator1.pth")
+        torch.save(discriminator, params_dir / f"{stock}_discriminator1.pth")
 
 
         
         print("Done training LOB_GAN for stock " + stock)
+        
+        
+        
+        # plot loss curves for this stock
+        # Save under: ROOT/plots/training_plots/<PARAMS_x>/
+        plots_root = ROOT / "plots" / "training_plots"
+        plots_root.mkdir(parents=True, exist_ok=True)
+
+        # use the same name as the OUTPUT_DIR subfolder (e.g. PARAMS_1)
+        PLOT_DIR = plots_root / params_dir.name
+        PLOT_DIR.mkdir(parents=True, exist_ok=True)
+        
+        steps = range(len(train_g_loss))
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(steps, train_g_loss, label="Train Generator loss")
+        plt.plot(steps, train_d_loss, label="Train Discriminator loss")
+        plt.plot(steps, eval_g_loss,  label="Eval Generator loss")
+        plt.plot(steps, eval_d_loss,  label="Eval Discriminator loss")
+
+        plt.xlabel("Training step (batch updates)")
+        plt.ylabel("Loss")
+
+        plt.title(
+            f"GAN Loss Curves — Stock {stock}\n"
+            f"G: lr={G_PARAMS['lr']}, betas={G_PARAMS['betas']} | "
+            f"D: lr={D_PARAMS['lr']}, betas={D_PARAMS['betas']}"
+        )
+
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+
+        filename = (
+            f"{stock}_loss_plot"
+            f"_G_lr{G_PARAMS['lr']}_D_lr{D_PARAMS['lr']}.png"
+        )
+        filepath = PLOT_DIR / filename
+
+        plt.savefig(filepath, dpi=300)
+        plt.close()
+
+        print(f"Saved plot: {filepath}")
+        print("Done training LOB_GAN for stock " + stock)
     
     
+if __name__ == '__main__':
+        
+    stocks = ['2330','0050', '0056']
+    for stock in stocks:
+        run_gan(stock)
+        print(f'completed stock : {stock}')

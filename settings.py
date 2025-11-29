@@ -7,3 +7,6 @@ OUTPUT_DIR = Path(__file__).resolve().parent.parent / 'output_train'
 
 # file = DATA_DIR / "0056_md_202310_202310.csv.gz"
 
+# params (for display + filename)
+G_PARAMS = {'lr': 0.001, 'betas': (0.99, 0.999)}
+D_PARAMS = {'lr': 0.001,   'betas': (0.99, 0.999)}
