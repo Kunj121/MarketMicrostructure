@@ -494,6 +494,7 @@ def run_gan(stock: str):
         print(f"Saved plot: {filepath}")
         print("Done training LOB_GAN for stock " + stock)
 
+
     
     
     

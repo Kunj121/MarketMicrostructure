@@ -211,6 +211,8 @@ def run_gan_test(lr_g, lr_d, stock):
         minutelyData = prepareMinutelyData(df, tradingDays)
         print("Minutely data generated.")
     
+    minutelyData['seq_id'] = minutelyData.groupby('date').ngroup()
+
     projdata = []
     columns = ['date', 'time', 'lastPx', 'size', 'volume',
             'SP5', 'SP4', 'SP3', 'SP2', 'SP1',
@@ -218,11 +220,13 @@ def run_gan_test(lr_g, lr_d, stock):
             'SV5', 'SV4', 'SV3', 'SV2', 'SV1',
             'BV1', 'BV2', 'BV3', 'BV4', 'BV5']
     
-    for x in minutelyData.groupby('date'):
-        if x[1].shape[0] == 265:
-            projdata.append(x[1].values)
+    for _, df_day in minutelyData.groupby('date'):
+        if df_day.shape[0] == 265:
+            # use only the defined feature columns in a fixed order
+            projdata.append(df_day[columns].values)
 
-    projdata = np.array(projdata)    
+
+    projdata = np.array(projdata)   
     
     #normalization
     X = projdata[:,:,5:].astype(float)
@@ -249,7 +253,8 @@ def run_gan_test(lr_g, lr_d, stock):
     
     #dataloaders
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
-    
+    test_data = projdata[:,:,:]
+    seq_ids = np.arange(test_data.shape[0])
     #load the model
     # Find correct PARAMS folder for this lr_g / lr_d
     params_folder = find_params_folder(lr_g, lr_d)
@@ -274,48 +279,54 @@ def run_gan_test(lr_g, lr_d, stock):
     ret = price.groupby(['date', 'index']).apply(get_return)
     ret.index = ret.index.swaplevel()
     ret = ret.rename(columns={'price': 'realRtn'})
+    ret = ret.reset_index()    
 
         # ensure directory exists
     params_test_dir = OUTPUT_DIR_TEST / params_folder
     params_test_dir.mkdir(parents=True, exist_ok=True)
-    # write CSVs
-    ret_csv_path = params_test_dir / f"{stock}_ret.csv"
-    print('Normal \n')
-    print('-------------------------')
-    print(ret.shape)
-    ret.to_csv(ret_csv_path)
+
 
 
     # compare "abnormal" quantifiers
     discriminator.eval()
-    dis_index_list = []
+    dis_seq_id_list = []
     dis_ret_list = []
     dis_tomoret_list = []
     dis_date_list = []
+
     for i, data in enumerate(test_dataloader):
-        if discriminator(data) <= 0.5:
-            #counter += 1
-            date = test_data[i,0,0]
-            index = test_data[i, 0, -1]
-            
-            today_return = test_data[i,-1,2] / test_data[i,0,2] - 1
+        with torch.no_grad():
+            score = discriminator(data).item()
+
+        if score <= 0.5:
+            # clean sequence ID and date
+            seq_id = int(seq_ids[i])
+            date = test_data[i, 0, 0]   # first row's date for this seq
+
+            # today's return
+            today_return = test_data[i, -1, 2] / test_data[i, 0, 2] - 1
             dis_ret_list.append(today_return)
-            dis_index_list.append(index)
+            dis_seq_id_list.append(seq_id)
             dis_date_list.append(date)
-            
+
+            # tomorrow = next sequence in order, or same if last
             j = i + 1
-            while j < test_data.shape[0] and test_data[j, 0, -1] != index:
-                j += 1
-            if j == test_data.shape[0]: j -= 1
-            tomorrow_return = test_data[j,-1,2] / test_data[j,0,2] - 1
-            dis_tomoret_list.append(tomorrow_return)    
-        
+            if j >= test_data.shape[0]:
+                j = i
+            tomorrow_return = test_data[j, -1, 2] / test_data[j, 0, 2] - 1
+            dis_tomoret_list.append(tomorrow_return)
+
+        # still run generator (if needed)
         genLOBData = pd.DataFrame(generator(data).detach().numpy()[0])
-        
-    dis_ret = pd.DataFrame()
-    dis_ret.index = dis_index_list
-    dis_ret['return'] = dis_ret_list
-    dis_ret['tomorrow_return'] = dis_tomoret_list
+
+    # build abnormal DataFrame with explicit date column
+    dis_ret = pd.DataFrame({
+        'seq_id': dis_seq_id_list,
+        'date': dis_date_list,
+        'return': dis_ret_list,
+        'tomorrow_return': dis_tomoret_list,
+    }).set_index('seq_id')
+
     print('Abnormal \n')
     print('-------------------------')
     print(dis_ret.shape)
@@ -323,6 +334,16 @@ def run_gan_test(lr_g, lr_d, stock):
 
     dis_ret_csv_path = params_test_dir / f"{stock}_dis_ret.csv"
     dis_ret.to_csv(dis_ret_csv_path)
+
+
+    abnormal_dates = dis_ret['date'].unique()
+    normal_set = ret[~ret['date'].isin(abnormal_dates)]
+    ret_csv_path = params_test_dir / f"{stock}_ret.csv"
+    print('Normal \n')
+    print('-------------------------')
+    print(ret.shape)
+    normal_set.to_csv(ret_csv_path)
+
 
     if len(dis_ret) == 0:
         print(f"[{stock}] Discriminator flagged 0 sequences; skipping KDE plot.")    
@@ -338,9 +359,12 @@ def run_gan_test(lr_g, lr_d, stock):
     plt.savefig(plot_subdir / f"{stock}_return.png")
     plt.close()
 
+    return minutelyData
+
 if __name__ == '__main__':
         
     stocks = ['0056', '0050', '2330']
     for stock in stocks:
         run_gan_test(lr_g = 0.00375, lr_d = 0.001, stock= stock)
         print(f'completed stock : {stock}')
+        break
